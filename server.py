@@ -1,21 +1,108 @@
 """
-OLTogether relay server.
-- Sends HELLO,<id> to each client when they connect so they know their own ID.
-- Broadcasts each client's LOC packets to all others as <id>,LOC,...
-- Broadcasts DISCONNECT,<id> when a client leaves.
+OLTogether relay server — no external dependencies.
 """
 
 import asyncio
 import itertools
+import re
+import socket
+import sys
+from collections import deque
+from datetime import datetime
 
 HOST = "0.0.0.0"
 PORT = 7777
 
-clients: dict[asyncio.StreamWriter, int] = {}
+clients: dict = {}
 id_counter = itertools.count(1)
+_log_lines: deque = deque(maxlen=15)
+
+_RST = "\033[0m"
+_BLD = "\033[1m"
+_DIM = "\033[2m"
+_RED = "\033[31m"
+_GRN = "\033[32m"
+_YLW = "\033[33m"
+_CYN = "\033[36m"
+_WHT = "\033[97m"
+_BCY = "\033[96m"
+
+_ANSI = re.compile(r'\033\[[0-9;]*m')
+_W    = 56  # total box width including borders
 
 
-async def broadcast(sender: asyncio.StreamWriter, data: bytes) -> None:
+def _vis(s: str) -> int:
+    return len(_ANSI.sub('', s))
+
+
+def _server_ip() -> str:
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+    except Exception:
+        return "127.0.0.1"
+
+
+_IP = _server_ip()
+
+
+def _row(content: str) -> str:
+    pad = _W - 4 - _vis(content)
+    return f"{_BCY}│{_RST} {content}{' ' * max(0, pad)} {_BCY}│{_RST}"
+
+
+def _draw() -> None:
+    inner = _W - 2
+    out   = ["\033[H\033[J"]
+
+    title = "OLTogether Relay"
+    tpad  = (inner - len(title)) // 2
+    out.append(f"{_BCY}╭{'─' * inner}╮{_RST}")
+    out.append(f"{_BCY}│{_RST}{' ' * tpad}{_BLD}{_WHT}{title}{_RST}"
+               f"{' ' * (inner - tpad - len(title))}{_BCY}│{_RST}")
+    out.append(f"{_BCY}├{'─' * inner}┤{_RST}")
+
+    out.append(_row(f"{_CYN}Server State{_RST}  {_GRN}{_BLD}● Running{_RST}"))
+    out.append(_row(f"{_CYN}Players{_RST}       {_YLW}{_BLD}{len(clients)}{_RST}"))
+    out.append(_row(f"{_CYN}IP{_RST}            {_WHT}{_IP}{_RST}"))
+    out.append(_row(f"{_CYN}Port{_RST}          {_WHT}{PORT}{_RST}"))
+
+    out.append(f"{_BCY}├{'─' * inner}┤{_RST}")
+    out.append(_row(f"{_BLD}{'Player':<12}{'Address':<24}Since{_RST}"))
+    out.append(_row(f"{_DIM}{'─' * (inner - 4)}{_RST}"))
+
+    if clients:
+        for info in clients.values():
+            line = (f"{_YLW}Player {info['id']:<4}{_RST}"
+                    f"{_CYN}{info['addr']:<24}{_RST}"
+                    f"{_DIM}{info['since']}{_RST}")
+            out.append(_row(line))
+    else:
+        out.append(_row(f"{_DIM}— waiting for players…{_RST}"))
+
+    out.append(f"{_BCY}╰{'─' * inner}╯{_RST}")
+    out.append("")
+
+    for entry in _log_lines:
+        out.append(entry)
+
+    sys.stdout.write("\n".join(out) + "\n")
+    sys.stdout.flush()
+
+
+def _log(msg: str) -> None:
+    ts = datetime.now().strftime("%H:%M:%S")
+    _log_lines.append(f"{_DIM}[{ts}]{_RST} {msg}")
+
+
+async def _display_loop() -> None:
+    while True:
+        _draw()
+        await asyncio.sleep(1.0)
+
+
+async def broadcast(sender, data: bytes) -> None:
     dead = []
     for writer in list(clients):
         if writer is sender:
@@ -29,26 +116,31 @@ async def broadcast(sender: asyncio.StreamWriter, data: bytes) -> None:
         await _remove_client(w)
 
 
-async def _remove_client(writer: asyncio.StreamWriter) -> None:
-    player_id = clients.pop(writer, None)
-    if player_id is None:
+async def _remove_client(writer) -> None:
+    info = clients.pop(writer, None)
+    if info is None:
         return
     try:
         writer.close()
         await writer.wait_closed()
     except Exception:
         pass
-    print(f"[-] Player {player_id} removed")
-    await broadcast(writer, f"{player_id},DISCONNECT\n".encode())
+    pid = info["id"]
+    _log(f"{_RED}[-]{_RST} Player {pid} disconnected  ({info['addr']})")
+    await broadcast(writer, f"{pid},DISCONNECT\n".encode())
 
 
 async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
-    addr      = writer.get_extra_info("peername")
+    peername  = writer.get_extra_info("peername")
+    addr      = f"{peername[0]}:{peername[1]}" if peername else "unknown"
     player_id = next(id_counter)
-    clients[writer] = player_id
-    print(f"[+] Player {player_id} connected from {addr}")
+    clients[writer] = {
+        "id":    player_id,
+        "addr":  addr,
+        "since": datetime.now().strftime("%H:%M:%S"),
+    }
+    _log(f"{_GRN}[+]{_RST} Player {player_id} connected from {addr}")
 
-    # Tell this client their own ID immediately
     try:
         writer.write(f"HELLO,{player_id}\n".encode())
         await writer.drain()
@@ -61,11 +153,10 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
             line = await reader.readline()
             if not line:
                 break
-            if line.startswith(b'PING,'):
-                writer.write(b'PONG,' + line[5:])
+            if line.startswith(b"PING,"):
+                writer.write(b"PONG," + line[5:])
                 await writer.drain()
             else:
-                # Forward as: SenderID,LOC,x,y,...
                 await broadcast(writer, f"{player_id},".encode() + line)
     except (asyncio.IncompleteReadError, ConnectionResetError):
         pass
@@ -75,7 +166,8 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
 
 async def main() -> None:
     server = await asyncio.start_server(handle_client, HOST, PORT)
-    print(f"[server] OLTogether relay listening on {HOST}:{PORT}")
+    asyncio.create_task(_display_loop())
+    _log(f"{_BCY}Listening on {_IP}:{PORT}{_RST}")
     async with server:
         await server.serve_forever()
 

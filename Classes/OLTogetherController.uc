@@ -155,6 +155,7 @@ event PlayerTick(float DeltaTime)
                 UpdateCrouchAnim(i, AnimVel);
         }
     }
+
 }
 
 function SetupDummyVisuals(OLHero H)
