@@ -41,14 +41,8 @@ function AddNotification(string Msg)
 
 function int CountRemotePlayers()
 {
-    local int i, Count;
-    if (TogetherController == None)
-        return 0;
-    Count = 0;
-    for (i = 0; i < 8; i++)
-        if (TogetherController.RemoteID[i] != 0)
-            Count++;
-    return Count;
+    if (TogetherController == None) return 0;
+    return TogetherController.RemotePlayers.Length;
 }
 
 function byte SafeByte(float Value)
@@ -150,18 +144,15 @@ event DrawHUD()
         Y += 16;
     }
 
-    for (i = 0; i < 8; i++)
+    for (i = 0; i < TogetherController.RemotePlayers.Length; i++)
     {
-        if (TogetherController.RemoteID[i] == 0)
-            continue;
-
         Canvas.SetPos(X + 1, Y + 1);
         Canvas.SetDrawColor(0, 0, 0, 120);
-        Canvas.DrawText("  Player " $ TogetherController.RemoteID[i],, 1.0, 1.0);
+        Canvas.DrawText("  Player " $ TogetherController.RemotePlayers[i].PlayerID,, 1.0, 1.0);
 
         Canvas.SetPos(X, Y);
         Canvas.SetDrawColor(180, 180, 255, 200);
-        Canvas.DrawText("  Player " $ TogetherController.RemoteID[i],, 1.0, 1.0);
+        Canvas.DrawText("  Player " $ TogetherController.RemotePlayers[i].PlayerID,, 1.0, 1.0);
         Y += 16;
     }
 
