@@ -17,7 +17,7 @@ event PostBeginPlay()
     if (ServerPort <= 0)
         ServerPort = 7777;
 
-    `log("OLTogetherLink: Connecting to" @ ServerHost $ ":" $ string(ServerPort));
+    `log("OutlastMM: Connecting to" @ ServerHost $ ":" $ string(ServerPort));
 
     LinkMode     = MODE_Line;
     ReceiveMode  = RMODE_Event;
@@ -38,19 +38,19 @@ event ResolveFailed()
 {
     bIsResolving = false;
     bIsConnected = false;
-    `log("OLTogetherLink: DNS resolve failed for" @ ServerHost);
+    `log("OutlastMM: DNS resolve failed for" @ ServerHost);
 }
 
 event Opened()
 {
     bIsConnected = true;
-    `log("OLTogetherLink: Connected to" @ ServerHost $ ":" $ string(ServerPort));
+    `log("OutlastMM: Connected to" @ ServerHost $ ":" $ string(ServerPort));
 }
 
 event Closed()
 {
     bIsConnected = false;
-    `log("OLTogetherLink: Disconnected.");
+    `log("OutlastMM: Disconnected.");
 }
 
 event ReceivedLine(string Line)
