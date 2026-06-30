@@ -41,19 +41,19 @@ event DrawHUD()
     // ── Determine status string ───────────────
     if (Link == None)
     {
-        StatusText = "OLTogether: Initializing...";
+        StatusText = "OutlastMM: Initializing...";
         R = 180; G = 180; B = 180;
         bJustConnected = false;
     }
     else if (Link.bIsResolving)
     {
-        StatusText = "OLTogether: Connecting to " $ Link.ServerHost $ ":" $ string(Link.ServerPort) $ "...";
+        StatusText = "OutlastMM: Connecting to " $ Link.ServerHost $ ":" $ string(Link.ServerPort) $ "...";
         R = 255; G = 200; B = 0;
         bJustConnected = false;
     }
     else if (!Link.bIsConnected)
     {
-        StatusText = "OLTogether: Disconnected";
+        StatusText = "OutlastMM: Disconnected";
         R = 255; G = 60; B = 60;
         bJustConnected = false;
         ConnectedFlashEndTime = 0;
@@ -69,12 +69,12 @@ event DrawHUD()
 
         if (WorldInfo.TimeSeconds < ConnectedFlashEndTime)
         {
-            StatusText = "OLTogether: Connected!";
+            StatusText = "OutlastMM: Connected!";
             R = 80; G = 255; B = 80;
         }
         else
         {
-            StatusText = "OLTogether  [" $ string(CountRemotePlayers()) $ " player(s) online]";
+            StatusText = "OutlastMM  [" $ string(CountRemotePlayers()) $ " player(s) online]";
             R = 80; G = 200; B = 80;
         }
     }
