@@ -164,6 +164,8 @@ event DrawHUD()
         Y += 16;
     }
 
+    DrawPlayerLabels();
+
     AliveCount = 0;
     for (i = 0; i < NotifCount; i++)
     {
@@ -197,6 +199,48 @@ event DrawHUD()
         Canvas.DrawText(NotifText[i],, 1.0, 1.0);
 
         Y += 18;
+    }
+}
+
+function DrawPlayerLabels()
+{
+    local int     i;
+    local vector  WorldPos, ScreenPos;
+    local string  LabelText;
+    local float   XL, YL, Dist, Alpha;
+
+    if (TogetherController == None || PlayerOwner == None || PlayerOwner.Pawn == None)
+        return;
+
+    for (i = 0; i < TogetherController.RemotePlayers.Length; i++)
+    {
+        if (TogetherController.RemotePlayers[i].DummyPlayer == None) continue;
+
+        WorldPos    = TogetherController.RemotePlayers[i].DummyPlayer.Location;
+        WorldPos.Z += 190.0;
+
+        ScreenPos = Canvas.Project(WorldPos);
+        if (ScreenPos.Z <= 0.0) continue;
+
+        Dist = VSize(WorldPos - PlayerOwner.Pawn.Location);
+        if (Dist > 4000.0) continue;
+
+        // Fade out between 2000 and 4000 units
+        if (Dist > 2000.0)
+            Alpha = (1.0 - (Dist - 2000.0) / 2000.0) * 220.0;
+        else
+            Alpha = 220.0;
+
+        LabelText = "Player " $ TogetherController.RemotePlayers[i].PlayerID;
+        Canvas.TextSize(LabelText, XL, YL);
+
+        Canvas.SetPos(ScreenPos.X - XL * 0.5 + 1, ScreenPos.Y + 1);
+        Canvas.SetDrawColor(0, 0, 0, SafeByte(Alpha * 0.7));
+        Canvas.DrawText(LabelText,, 1.0, 1.0);
+
+        Canvas.SetPos(ScreenPos.X - XL * 0.5, ScreenPos.Y);
+        Canvas.SetDrawColor(200, 220, 255, SafeByte(Alpha));
+        Canvas.DrawText(LabelText,, 1.0, 1.0);
     }
 }
 
