@@ -173,6 +173,8 @@ event PlayerTick(float DeltaTime)
                 DH.ShadowProxy.SetHidden(bShouldFade);
             if (DH.HeadMesh != None)
                 DH.HeadMesh.SetHidden(bShouldFade);
+            if (bShouldFade && DH.CameraMeshShadowProxy != None)
+                DH.CameraMeshShadowProxy.SetHidden(true);
         }
     }
 
