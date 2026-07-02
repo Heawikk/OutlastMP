@@ -1,4 +1,4 @@
-class OLTogetherHero extends OLHero;
+class OLMPHero extends OLHero;
 
 event Tick(float DeltaTime)
 {

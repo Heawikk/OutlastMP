@@ -1,4 +1,4 @@
-class OLTogetherHUD extends OLHUD;
+class OLMPHUD extends OLHUD;
 
 const MAX_NOTIFICATIONS = 5;
 
@@ -7,7 +7,7 @@ var float  NotifExpire [5];
 var int    NotifCount;
 var float  NotifDuration;
 
-var OLTogetherController TogetherController;
+var OLMPController TogetherController;
 var float ConnectedFlashDuration;
 var float ConnectedFlashEndTime;
 var bool  bJustConnected;
@@ -72,7 +72,7 @@ event DrawHUD()
     if (WorldInfo.bRequestedBlockOnAsyncLoading)                    return;
 
     if (TogetherController == None)
-        TogetherController = OLTogetherController(PlayerOwner);
+        TogetherController = OLMPController(PlayerOwner);
     if (TogetherController == None) return;
 
     DrawStatusPanel();
@@ -83,7 +83,7 @@ event DrawHUD()
 // ─── Top-left status panel ────────────────────────────────────────────────────
 function DrawStatusPanel()
 {
-    local OLTogetherLink Link;
+    local OLMPLink Link;
     local string   NameText, RightText;
     local float    PH, TY, XL, YL, Pulse;
     local byte     AR, AG, AB, SR, SG, SB, PR, PG, PB;
@@ -162,7 +162,7 @@ function DrawStatusPanel()
     // title
     Canvas.SetPos(PX + 18.0, TY + 3.0);
     Canvas.SetDrawColor(218, 196, 174, 248);
-    Canvas.DrawText("OUTLASTMM",, 1.0, 1.0);
+    Canvas.DrawText("OUTLASTMP",, 1.0, 1.0);
 
     // right side: pulsing status OR count + ping
     if (RightText != "")

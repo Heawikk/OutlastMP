@@ -1,6 +1,6 @@
-class OLTogetherController extends OLPlayerController;
+class OLMPController extends OLPlayerController;
 
-var OLTogetherLink NetworkLink;
+var OLMPLink NetworkLink;
 var int   MyRole;
 var float LastSendTime;
 var float InterpSpeed;
@@ -12,7 +12,7 @@ struct RemotePlayerState
 {
     var int   PlayerID;
     var Pawn  DummyPlayer;
-    var OLTogetherRemoteTimer TimerHelper;
+    var OLMPRemoteTimer TimerHelper;
 
     var vector  LastReceivedLoc;
     var vector  LastReceivedVel;
@@ -26,6 +26,7 @@ struct RemotePlayerState
     var int    LastLocomotionMode;
     var name   LastCrouchAnim;
     var int    LastDoorDir;
+    var int    LastLeanDir;
     var string Nickname;
 };
 var array<RemotePlayerState> RemotePlayers;
@@ -40,7 +41,7 @@ simulated event PostBeginPlay()
 {
     super.PostBeginPlay();
     MyRole = int(WorldInfo.Game.ParseOption(WorldInfo.Game.ServerOptions, "Role"));
-    NetworkLink = Spawn(class'OLTogetherLink', self);
+    NetworkLink = Spawn(class'OLMPLink', self);
     if (NetworkLink != None)
         NetworkLink.ControllerOwner = self;
     SetTimer(1.0, true, 'SendPing');
@@ -48,10 +49,10 @@ simulated event PostBeginPlay()
 
 exec function ToggleGhostMode()
 {
-    local OLTogetherHUD THUD;
+    local OLMPHUD THUD;
     bGhostMode = !bGhostMode;
     ConsoleCommand("ghost");
-    THUD = OLTogetherHUD(myHUD);
+    THUD = OLMPHUD(myHUD);
     if (THUD != None)
         THUD.AddNotification(bGhostMode ? "Ghost On" : "Ghost Off");
 }
@@ -93,7 +94,7 @@ event PlayerTick(float DeltaTime)
     local float   Alpha, DistToDummy;
     local bool    bShouldFade;
     local OLHero  DH, LocalHero;
-    local int     DoorDir;
+    local int     DoorDir, LeanDir;
 
     super.PlayerTick(DeltaTime);
 
@@ -123,6 +124,10 @@ event PlayerTick(float DeltaTime)
                         break;
                 }
             }
+            LeanDir = 0;
+            if (bLeanInputLeft != 0)       LeanDir = 1;
+            else if (bLeanInputRight != 0) LeanDir = 2;
+
             Payload = "LOC,"
                 $ Pawn.Location.X $ "," $ Pawn.Location.Y $ "," $ Pawn.Location.Z $ ","
                 $ Rotation.Pitch  $ "," $ Rotation.Yaw    $ ","
@@ -132,7 +137,8 @@ event PlayerTick(float DeltaTime)
                 $ (LocalHero != None ? int(LocalHero.CamcorderState)    : 0) $ ","
                 $ (LocalHero != None ? int(LocalHero.LocomotionMode) : 0) $ ","
                 $ (LocalHero != None ? int(LocalHero.SpecialMove) : 0) $ ","
-                $ DoorDir;
+                $ DoorDir $ ","
+                $ LeanDir;
             NetworkLink.SendText(Payload $ "\n");
         }
 
@@ -144,7 +150,7 @@ event PlayerTick(float DeltaTime)
         if (RemotePlayers[i].DummyPlayer != None || Pawn == None || !RemotePlayers[i].bHasReceivedData)
             continue;
 
-        RemotePlayers[i].DummyPlayer = Spawn(class'OLTogetherHero',,, Pawn.Location, Pawn.Rotation,, true);
+        RemotePlayers[i].DummyPlayer = Spawn(class'OLMPHero',,, Pawn.Location, Pawn.Rotation,, true);
         if (RemotePlayers[i].DummyPlayer != None)
         {
             RemotePlayers[i].DummyPlayer.SetPhysics(PHYS_None);
@@ -187,11 +193,25 @@ event PlayerTick(float DeltaTime)
         RemotePlayers[i].DummyPlayer.Acceleration = AnimVel;
 
         DH = OLHero(RemotePlayers[i].DummyPlayer);
-        if (DH != None && RemotePlayers[i].LastLocomotionMode == 0)
+        if (DH != None)
         {
-            DH.LocomotionMode = LM_Walk;
-            if (RemotePlayers[i].bLastRemoteCrouched)
-                UpdateCrouchAnim(i, AnimVel);
+            if (RemotePlayers[i].LastLocomotionMode == 0)
+            {
+                DH.LocomotionMode = LM_Walk;
+                DH.CurrentLean    = 0.0;
+                if (RemotePlayers[i].bLastRemoteCrouched)
+                    UpdateCrouchAnim(i, AnimVel);
+            }
+            else if (RemotePlayers[i].LastLocomotionMode == 15) // LM_ContextualLean
+            {
+                DH.LocomotionMode = LM_Walk;
+                if (RemotePlayers[i].LastLeanDir == 1)
+                    DH.CurrentLean = -1.0;
+                else if (RemotePlayers[i].LastLeanDir == 2)
+                    DH.CurrentLean = 1.0;
+                else
+                    DH.CurrentLean = 0.0;
+            }
         }
 
         // --- Proximity fade (speedrunner feature) ---
@@ -294,7 +314,7 @@ function UpdateCrouchAnim(int Idx, vector AnimVel2D)
     }
 }
 
-// --- Callbacks from OLTogetherRemoteTimer ---
+// --- Callbacks from OLMPRemoteTimer ---
 
 function PlayCamcorderIdleAnimFor(int PlayerID)
 {
@@ -348,7 +368,7 @@ function PlayCrouchIdleFor(int PlayerID)
         DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_crouch_idle', 1.0, 0.15, 0.0, true, true);
 }
 
-// Called by OLTogetherLink when a (re)connection is established
+// Called by OLMPLink when a (re)connection is established
 function OnReconnected()
 {
     local int i;
@@ -387,17 +407,17 @@ function OnReceiveData(string Data)
     local vector NewLoc, NewVel;
     local rotator NewRot;
     local bool bNewCrouched, bNewCamcorder;
-    local int NewCamcorderState, NewLocoMode, OldLocoMode, NewSpecialMove, NewDoorDir;
+    local int NewCamcorderState, NewLocoMode, OldLocoMode, NewSpecialMove, NewDoorDir, NewLeanDir;
     local int    SenderID, Idx;
     local string Nick;
     local OLHero DH;
     local RemotePlayerState NewState;
-    local OLTogetherHUD THUD;
+    local OLMPHUD THUD;
 
     Parts = SplitString(Data, ",", true);
     if (Parts.Length < 2) return;
 
-    THUD = OLTogetherHUD(myHUD);
+    THUD = OLMPHUD(myHUD);
 
     // PONG response to our own PING
     if (Parts[0] == "PONG")
@@ -454,7 +474,8 @@ function OnReceiveData(string Data)
                     NewState.LastRemoteCamcorderState = 0;
                     NewState.LastLocomotionMode = 0;
                     NewState.LastCrouchAnim           = '';
-                    NewState.TimerHelper = Spawn(class'OLTogetherRemoteTimer', self);
+                    NewState.LastLeanDir               = 0;
+                    NewState.TimerHelper = Spawn(class'OLMPRemoteTimer', self);
                     if (NewState.TimerHelper != None)
                     {
                         NewState.TimerHelper.ControllerOwner = self;
@@ -487,7 +508,8 @@ function OnReceiveData(string Data)
         NewState.LastRemoteCamcorderState = 0;
         NewState.LastLocomotionMode = 0;
         NewState.LastCrouchAnim     = '';
-        NewState.TimerHelper = Spawn(class'OLTogetherRemoteTimer', self);
+        NewState.LastLeanDir        = 0;
+        NewState.TimerHelper = Spawn(class'OLMPRemoteTimer', self);
         if (NewState.TimerHelper != None)
         {
             NewState.TimerHelper.ControllerOwner = self;
@@ -514,6 +536,7 @@ function OnReceiveData(string Data)
     NewLocoMode       = int(Parts[13]);
     NewSpecialMove    = int(Parts[14]);
     NewDoorDir        = (Parts.Length >= 16) ? int(Parts[15]) : 0;
+    NewLeanDir        = (Parts.Length >= 17) ? int(Parts[16]) : 0;
 
     RemotePlayers[Idx].LastReceivedLoc  = NewLoc;
     RemotePlayers[Idx].LastReceivedVel  = NewVel;
@@ -641,6 +664,8 @@ function OnReceiveData(string Data)
         }
         RemotePlayers[Idx].LastRemoteCamcorderState = NewCamcorderState;
     }
+
+    RemotePlayers[Idx].LastLeanDir = NewLeanDir;
 
     // --- Locomotion mode ---
     if (NewLocoMode != RemotePlayers[Idx].LastLocomotionMode)

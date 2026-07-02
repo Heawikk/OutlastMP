@@ -1,7 +1,7 @@
-class OLTogetherLink extends TcpLink
+class OLMPLink extends TcpLink
     config(Multiplayer);
 
-var OLTogetherController ControllerOwner;
+var OLMPController ControllerOwner;
 var bool bIsConnected;
 var bool bIsResolving;
 var bool bIsReconnecting;
@@ -40,7 +40,7 @@ function TryStartConnect()
 
     ClearTimer('TryStartConnect');
     bIsResolving = true;
-    `log("OutlastMM: Connecting to" @ ServerHost $ ":" $ string(ServerPort));
+    `log("OUTLASTMP: Connecting to" @ ServerHost $ ":" $ string(ServerPort));
     Resolve(ServerHost);
 }
 
@@ -52,7 +52,7 @@ function AttemptReconnect()
         return;
     }
     bIsResolving = true;
-    `log("OutlastMM: Reconnecting to" @ ServerHost $ ":" $ string(ServerPort));
+    `log("OUTLASTMP: Reconnecting to" @ ServerHost $ ":" $ string(ServerPort));
     Resolve(ServerHost);
 }
 
@@ -69,7 +69,7 @@ event ResolveFailed()
     bIsResolving    = false;
     bIsConnected    = false;
     bIsReconnecting = true;
-    `log("OutlastMM: DNS resolve failed. Retrying in 3s...");
+    `log("OUTLASTMP: DNS resolve failed. Retrying in 3s...");
     SetTimer(3.0, false, 'AttemptReconnect');
 }
 
@@ -77,7 +77,7 @@ event Opened()
 {
     bIsConnected    = true;
     bIsReconnecting = false;
-    `log("OutlastMM: Connected to" @ ServerHost $ ":" $ string(ServerPort));
+    `log("OUTLASTMP: Connected to" @ ServerHost $ ":" $ string(ServerPort));
     if (ControllerOwner != None)
         ControllerOwner.OnReconnected();
 }
@@ -87,7 +87,7 @@ event Closed()
     bIsConnected    = false;
     bIsResolving    = false;
     bIsReconnecting = true;
-    `log("OutlastMM: Disconnected. Reconnecting in 3s...");
+    `log("OUTLASTMP: Disconnected. Reconnecting in 3s...");
     SetTimer(3.0, false, 'AttemptReconnect');
 }
 

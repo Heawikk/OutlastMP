@@ -1,8 +1,8 @@
 // One instance per remote player. Routes timer callbacks back to the controller
 // so SetTimer/ClearTimer calls for different players never collide.
-class OLTogetherRemoteTimer extends Actor;
+class OLMPRemoteTimer extends Actor;
 
-var OLTogetherController ControllerOwner;
+var OLMPController ControllerOwner;
 var int PlayerID;
 
 function PlayIdleAnim()

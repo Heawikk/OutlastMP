@@ -7,7 +7,7 @@ CALL _load_config.cmd
 :MENU
 cls
 echo.
-echo   Outlast Multiplayer Mod
+echo   OutlastMP
 echo   --------------------------------
 echo   [1] Run Host
 echo   [2] Run Joiner
@@ -33,7 +33,7 @@ cls
 if "%GAME_DIR%"=="" ( echo   [ERROR] Game path not set. Go to [5] Settings. & pause & goto MENU )
 call :WRITE_MULTIPLAYER_INI
 echo   Starting HOST (Role=0)...
-start "" "%GAME%" "Intro_Persistent?game=Multiplayer.OLTogetherGame?Role=0" -log -nosteam
+start "" "%GAME%" "Intro_Persistent?game=Multiplayer.OLMPGame?Role=0" -log -nosteam
 echo   Done!
 pause
 goto MENU
@@ -54,7 +54,7 @@ if %ROLE_NUM% GTR 255 ( echo   Invalid number. & goto JOINER_INPUT )
 call :WRITE_MULTIPLAYER_INI
 echo.
 echo   Starting JOINER (Role=%ROLE_NUM%)...
-start "" "%GAME%" "Intro_Persistent?game=Multiplayer.OLTogetherGame?Role=%ROLE_NUM%" -log -nosteam
+start "" "%GAME%" "Intro_Persistent?game=Multiplayer.OLMPGame?Role=%ROLE_NUM%" -log -nosteam
 echo   Done! Wait for the game to load and connect.
 pause
 goto MENU
@@ -133,7 +133,7 @@ set /p NEW_VAL=    Game path (Enter to keep current):
 if "%NEW_VAL%"=="" goto SETTINGS
 set "GAME_DIR=%NEW_VAL%"
 set "GAME=%NEW_VAL%\Binaries\Win64\OLGame.exe"
-set "DST_DIR=%NEW_VAL%\OLGame\CookedPCConsole\MultiplayerContent"
+set "DST_DIR=%NEW_VAL%\OLGame\CookedPCConsole\OLMP"
 set "DST=%DST_DIR%\Multiplayer.u"
 set "SAVE_KEY=GAME_DIR" & set "SAVE_VAL=%NEW_VAL%" & call :SAVE_CONFIG
 goto SETTINGS
@@ -202,7 +202,7 @@ goto SETTINGS
 :WRITE_MULTIPLAYER_INI
 mkdir "%GAME_DIR%\OLGame\Config" 2>nul
 (
-echo [Multiplayer.OLTogetherLink]
+echo [Multiplayer.OLMPLink]
 echo ServerHost=%SERVER_HOST%
 echo ServerPort=%SERVER_PORT%
 echo PlayerNickname=%NICKNAME%

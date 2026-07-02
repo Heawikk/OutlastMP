@@ -1,5 +1,5 @@
 """
-OLTogether relay server — no external dependencies.
+OutlastMP relay server — no external dependencies.
 """
 
 import asyncio
@@ -74,7 +74,7 @@ def _draw() -> None:
     inner = _W - 2
     out   = ["\033[H\033[J"]
 
-    title = "OLTogether Relay"
+    title = "OutlastMP Relay"
     tpad  = (inner - len(title)) // 2
     out.append(f"{_BCY}╭{'─' * inner}╮{_RST}")
     out.append(f"{_BCY}│{_RST}{' ' * tpad}{_BLD}{_WHT}{title}{_RST}"

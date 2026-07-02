@@ -1,4 +1,4 @@
-﻿# OutlastMM - Outlast 1 Multiplayer Mod
+﻿# OutlastMP - Outlast 1 Multiplayer Mod
 
 An unofficial multiplayer mod for **Outlast 1** built on UnrealScript / UDK.
 
@@ -9,7 +9,7 @@ An unofficial multiplayer mod for **Outlast 1** built on UnrealScript / UDK.
 ## Install & Run
 
 1. Download or clone the repository to any folder. **No Cyrillic characters in the path.**
-2. Copy `Multiplayer.u` into your Outlast directory: `OLGame\CookedPCConsole\MultiplayerContent\` (create the folder if it does not exist).
+2. Copy `Multiplayer.u` into your Outlast directory: `OLGame\CookedPCConsole\OLMP\` (create the folder if it does not exist).
 3. Copy the `OLGame\Config\DefaultMultiplayer.ini` file into `<Outlast root>\OLGame\Config\`.
 4. Open `DefaultMultiplayer.ini` and set the server IP, port, and your nickname.
 5. Open `config.ini` and set the path to your Outlast executable (`GAME=...`).
