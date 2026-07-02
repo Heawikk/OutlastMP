@@ -25,6 +25,7 @@ struct RemotePlayerState
     var bool   bDummyCrouched;
     var int    LastLocomotionMode;
     var name   LastCrouchAnim;
+    var int    LastDoorDir;
     var string Nickname;
 };
 var array<RemotePlayerState> RemotePlayers;
@@ -91,7 +92,8 @@ event PlayerTick(float DeltaTime)
     local int     i;
     local float   Alpha, DistToDummy;
     local bool    bShouldFade;
-    local OLHero  DH;
+    local OLHero  DH, LocalHero;
+    local int     DoorDir;
 
     super.PlayerTick(DeltaTime);
 
@@ -107,15 +109,30 @@ event PlayerTick(float DeltaTime)
         if (WorldInfo.TimeSeconds - LastSendTime > 0.05)
         {
             LastSendTime = WorldInfo.TimeSeconds;
+            LocalHero = OLHero(Pawn);
+            DoorDir = 0;
+            if (LocalHero != None)
+            {
+                switch (int(LocalHero.SpecialMove))
+                {
+                    case 28: case 29: case 30: case 31: case 32:
+                        DoorDir = int(LocalHero.DoorOpeningType);
+                        break;
+                    case 33: case 34:
+                        DoorDir = int(LocalHero.DoorClosingType);
+                        break;
+                }
+            }
             Payload = "LOC,"
                 $ Pawn.Location.X $ "," $ Pawn.Location.Y $ "," $ Pawn.Location.Z $ ","
                 $ Rotation.Pitch  $ "," $ Rotation.Yaw    $ ","
                 $ Pawn.Velocity.X $ "," $ Pawn.Velocity.Y $ "," $ Pawn.Velocity.Z $ ","
                 $ int(Pawn.bIsCrouched) $ ","
-                $ (OLHero(Pawn) != None ? int(OLHero(Pawn).bCamcorderDesired) : 0) $ ","
-                $ (OLHero(Pawn) != None ? int(OLHero(Pawn).CamcorderState)    : 0) $ ","
-                $ (OLHero(Pawn) != None ? int(OLHero(Pawn).LocomotionMode) : 0) $ ","
-                $ (OLHero(Pawn) != None ? int(OLHero(Pawn).SpecialMove) : 0);
+                $ (LocalHero != None ? int(LocalHero.bCamcorderDesired) : 0) $ ","
+                $ (LocalHero != None ? int(LocalHero.CamcorderState)    : 0) $ ","
+                $ (LocalHero != None ? int(LocalHero.LocomotionMode) : 0) $ ","
+                $ (LocalHero != None ? int(LocalHero.SpecialMove) : 0) $ ","
+                $ DoorDir;
             NetworkLink.SendText(Payload $ "\n");
         }
 
@@ -370,7 +387,7 @@ function OnReceiveData(string Data)
     local vector NewLoc, NewVel;
     local rotator NewRot;
     local bool bNewCrouched, bNewCamcorder;
-    local int NewCamcorderState, NewLocoMode, OldLocoMode, NewSpecialMove;
+    local int NewCamcorderState, NewLocoMode, OldLocoMode, NewSpecialMove, NewDoorDir;
     local int    SenderID, Idx;
     local string Nick;
     local OLHero DH;
@@ -496,6 +513,7 @@ function OnReceiveData(string Data)
     NewCamcorderState = int(Parts[12]);
     NewLocoMode       = int(Parts[13]);
     NewSpecialMove    = int(Parts[14]);
+    NewDoorDir        = (Parts.Length >= 16) ? int(Parts[15]) : 0;
 
     RemotePlayers[Idx].LastReceivedLoc  = NewLoc;
     RemotePlayers[Idx].LastReceivedVel  = NewVel;
@@ -642,7 +660,7 @@ function OnReceiveData(string Data)
                 DH.LocomotionMode = LM_Fall;
                 break;
 
-            case 2: // LM_SpecialMove — jump, enter/exit bed or locker, etc.
+            case 2: // LM_SpecialMove — jump, enter/exit bed or locker, door, etc.
                 switch (NewSpecialMove)
                 {
                     case 3: // SMT_JumpOnSpot
@@ -652,6 +670,60 @@ function OnReceiveData(string Data)
                     case 5: // SMT_JumpOver
                         if (DH.ShadowProxyFullBodyAnimSlot != None)
                             DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_jump_from_run', 1.0, 0.1, 0.0, false, true);
+                        break;
+                    case 28: // SMT_EnterDoorInteraction — player approaches and grabs door
+                        RemotePlayers[Idx].LastDoorDir = NewDoorDir;
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim(
+                                (NewDoorDir < 2) ? 'player_door_access_left' : 'player_door_access_right',
+                                1.0, 0.1, 0.0, false, true);
+                        break;
+                    case 29: // SMT_OpenDoorInstant
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                        {
+                            switch (NewDoorDir)
+                            {
+                                case 0: DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_door_open_push_left',  1.0, 0.1, 0.0, false, true); break;
+                                case 1: DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_door_open_pull_left',  1.0, 0.1, 0.0, false, true); break;
+                                case 2: DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_door_open_push_right', 1.0, 0.1, 0.0, false, true); break;
+                                default: DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_door_open_pull_right',1.0, 0.1, 0.0, false, true); break;
+                            }
+                        }
+                        break;
+                    case 30: // SMT_OpenDoorPartial — door already ajar, player pushes it fully open
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim(
+                                (NewDoorDir < 2) ? 'player_door_open_inside_left' : 'player_door_open_inside_right',
+                                1.0, 0.1, 0.0, false, true);
+                        break;
+                    case 31: // SMT_TryOpenLockedDoor
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim(
+                                (NewDoorDir < 2) ? 'player_door_locked_left' : 'player_door_locked_right',
+                                1.0, 0.1, 0.0, false, true);
+                        break;
+                    case 32: // SMT_RunThroughDoor
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim(
+                                (NewDoorDir < 2) ? 'player_run_door_open_left' : 'player_run_door_open_right',
+                                1.0, 0.05, 0.1, false, true);
+                        break;
+                    case 33: // SMT_CloseDoor
+                    case 34: // SMT_CloseDoorPositionned
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                        {
+                            switch (NewDoorDir)
+                            {
+                                case 0: DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_door_close_left_front',   1.0, 0.1, 0.0, false, true); break;
+                                case 1: DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_door_close_left_side',    1.0, 0.1, 0.0, false, true); break;
+                                case 2: DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_door_close_left_back',    1.0, 0.1, 0.0, false, true); break;
+                                case 3: DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_door_close_inside_left',  1.0, 0.1, 0.0, false, true); break;
+                                case 4: DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_door_close_right_front',  1.0, 0.1, 0.0, false, true); break;
+                                case 5: DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_door_close_right_side',   1.0, 0.1, 0.0, false, true); break;
+                                case 6: DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_door_close_right_back',   1.0, 0.1, 0.0, false, true); break;
+                                default: DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_door_close_inside_right',1.0, 0.1, 0.0, false, true); break;
+                            }
+                        }
                         break;
                     case 37: // SMT_OpenLockerFromOutside — opens locker door from outside (visible to others)
                         if (DH.ShadowProxyFullBodyAnimSlot != None)
@@ -677,6 +749,13 @@ function OnReceiveData(string Data)
                 }
                 break;
 
+            case 7: // LM_Door — player holding/slowly pushing door open
+                if (DH.ShadowProxyFullBodyAnimSlot != None)
+                    DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim(
+                        (RemotePlayers[Idx].LastDoorDir < 2) ? 'player_door_access_left' : 'player_door_access_right',
+                        1.0, 0.15, -1.0, true, true);
+                break;
+
             case 8: // LM_Locker — hiding in wardrobe/locker
                 if (DH.ShadowProxyFullBodyAnimSlot != None)
                     DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_locker_hide', 1.0, 0.2, -1.0, true, true);
@@ -693,6 +772,11 @@ function OnReceiveData(string Data)
                 {
                     if (DH.ShadowProxyFullBodyAnimSlot != None)
                         DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_land', 1.0, 0.05, 0.1, false, true);
+                }
+                else if (OldLocoMode == 7) // was in interactive door push
+                {
+                    if (DH.ShadowProxyFullBodyAnimSlot != None)
+                        DH.ShadowProxyFullBodyAnimSlot.StopCustomAnim(0.15);
                 }
                 else if (OldLocoMode == 8) // was in locker
                 {
