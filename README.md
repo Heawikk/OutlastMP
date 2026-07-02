@@ -1,4 +1,4 @@
-﻿# OutlastMM - Outlast 1 Multiplayer Mod
+﻿# OutlastMP - Outlast 1 Multiplayer Mod
 
 An unofficial multiplayer mod for **Outlast 1** built on UnrealScript / UDK.
 
