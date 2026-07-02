@@ -25,5 +25,5 @@ An unofficial multiplayer mod for **Outlast 1** built on UnrealScript / UDK.
 - Load into the same checkpoint and enjoy!
 
 ## Additional Info 
-- The repository was previously based on the OutlastTogether repository by MeinaWithAI
-- Beerymaid (ShyKiss) also worked on this repository
+- The repository was previously based on the [OutlastTogether](https://github.com/MeinaWithAI/OutlastTogether) repository by [MeinaWithAI](https://github.com/MeinaWithAI/)
+- Beerymaid ([ShyKiss](https://github.com/ShyKiss)) also worked on this repository
