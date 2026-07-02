@@ -33,7 +33,7 @@ cls
 if "%GAME_DIR%"=="" ( echo   [ERROR] Game path not set. Go to [5] Settings. & pause & goto MENU )
 call :WRITE_MULTIPLAYER_INI
 echo   Starting HOST (Role=0)...
-powershell -Command "Start-Process -WindowStyle Normal -FilePath '%GAME%' -ArgumentList 'Intro_Persistent?game=Multiplayer.OLTogetherGame?Role=0?QuickPlay','-log','-WINDOWED','-ResX=1920','-ResY=1080','-WinX=50','-WinY=200','-nosteam'"
+start "" "%GAME%" "Intro_Persistent?game=Multiplayer.OLTogetherGame?Role=0?QuickPlay" -log -WINDOWED -ResX=1920 -ResY=1080 -WinX=50 -WinY=200 -nosteam
 echo   Done!
 pause
 goto MENU
@@ -54,7 +54,7 @@ if %ROLE_NUM% GTR 255 ( echo   Invalid number. & goto JOINER_INPUT )
 call :WRITE_MULTIPLAYER_INI
 echo.
 echo   Starting JOINER (Role=%ROLE_NUM%)...
-powershell -Command "Start-Process -WindowStyle Normal -FilePath '%GAME%' -ArgumentList 'Intro_Persistent?game=Multiplayer.OLTogetherGame?Role=%ROLE_NUM%?QuickPlay','-log','-WINDOWED','-ResX=1920','-ResY=1080','-WinX=50','-WinY=200','-nosteam'"
+start "" "%GAME%" "Intro_Persistent?game=Multiplayer.OLTogetherGame?Role=%ROLE_NUM%?QuickPlay" -log -WINDOWED -ResX=1920 -ResY=1080 -WinX=50 -WinY=200 -nosteam
 echo   Done! Wait for the game to load and connect.
 pause
 goto MENU
@@ -91,7 +91,7 @@ taskkill /F /IM python.exe >nul 2>&1
 taskkill /F /IM py.exe     >nul 2>&1
 timeout /t 1 /nobreak >nul
 echo   [2/2] Starting TCP relay server...
-powershell -Command "Start-Process -WindowStyle Normal -FilePath '%PY%' -ArgumentList '%~dp0%BRIDGE_SCRIPT%'"
+start "" "%PY%" "%~dp0%BRIDGE_SCRIPT%"
 timeout /t 2 /nobreak >nul
 echo.
 echo   Server launched. Close the server window to shut down.
@@ -191,5 +191,5 @@ echo NearbyFadeHysteresis=50.0
 exit /b
 
 :SAVE_CONFIG
-powershell -Command "$f=[System.IO.Path]::GetFullPath('%~dp0config.ini'); $k=$env:SAVE_KEY; $v=$env:SAVE_VAL; $out=(Get-Content $f)|ForEach-Object{if($_ -like ($k+'=*')){$k+'='+$v}else{$_}}; [System.IO.File]::WriteAllLines($f,$out,(New-Object System.Text.UTF8Encoding $false))"
+powershell -ExecutionPolicy Bypass -File "%~dp0Scripts\save_config.ps1"
 exit /b
