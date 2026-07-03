@@ -1,5 +1,5 @@
 ﻿# OutlastMP - Outlast 1 Multiplayer Mod
-# Based on [OutlastTogether](https://github.com/MeinaWithAI/OutlastTogether) by [MeinaWithAi](https://github.com/MeinaWithAI/OutlastTogether) & [superboo07](https://github.com/superboo07)
+# Based on [OutlastTogether](https://github.com/MeinaWithAI/OutlastTogether) by [MeinaWithAI](https://github.com/MeinaWithAI/OutlastTogether) & [superboo07](https://github.com/superboo07)
 
 An unofficial multiplayer mod for **Outlast 1** built on UnrealScript / UDK.
 
