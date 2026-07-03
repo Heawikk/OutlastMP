@@ -173,8 +173,14 @@ event PlayerTick(float DeltaTime)
         if (RemotePlayers[i].DummyPlayer == None || !RemotePlayers[i].bHasReceivedData)
             continue;
 
-        SmoothedLoc = VInterpTo(RemotePlayers[i].DummyPlayer.Location,
-                                RemotePlayers[i].LastReceivedLoc, DeltaTime, InterpSpeed);
+        if (RemotePlayers[i].LastLocomotionMode == 2   // LM_SpecialMove
+        ||  RemotePlayers[i].LastLocomotionMode == 3   // LM_Ladder
+        ||  RemotePlayers[i].LastLocomotionMode == 4   // LM_LedgeHang
+        ||  RemotePlayers[i].LastLocomotionMode == 5)  // LM_LedgeWalk
+            SmoothedLoc = RemotePlayers[i].LastReceivedLoc;
+        else
+            SmoothedLoc = VInterpTo(RemotePlayers[i].DummyPlayer.Location,
+                                    RemotePlayers[i].LastReceivedLoc, DeltaTime, InterpSpeed);
         RemotePlayers[i].DummyPlayer.SetLocation(SmoothedLoc);
 
         // Yaw only — Outlast character is rigid (no head/body rotation split).
@@ -186,9 +192,10 @@ event PlayerTick(float DeltaTime)
         SmoothedRot.Roll  = 0;
         RemotePlayers[i].DummyPlayer.SetRotation(SmoothedRot);
 
-        // Feed horizontal velocity to the AnimTree so walk/run locomotion plays
-        AnimVel   = RemotePlayers[i].LastReceivedVel;
-        AnimVel.Z = 0;
+        // Feed velocity to AnimTree; preserve Z on ladder so climb-up/down anim direction works
+        AnimVel = RemotePlayers[i].LastReceivedVel;
+        if (RemotePlayers[i].LastLocomotionMode != 3) // LM_Ladder
+            AnimVel.Z = 0;
         RemotePlayers[i].DummyPlayer.Velocity     = AnimVel;
         RemotePlayers[i].DummyPlayer.Acceleration = AnimVel;
 
@@ -246,6 +253,18 @@ event PlayerTick(float DeltaTime)
                     DH.CurrentLean = 1.0;
                 else
                     DH.CurrentLean = 0.0;
+            }
+            else if (RemotePlayers[i].LastLocomotionMode == 3) // LM_Ladder
+            {
+                DH.LocomotionMode = LM_Ladder;
+            }
+            else if (RemotePlayers[i].LastLocomotionMode == 4) // LM_LedgeHang
+            {
+                DH.LocomotionMode = LM_LedgeHang;
+            }
+            else if (RemotePlayers[i].LastLocomotionMode == 5) // LM_LedgeWalk
+            {
+                DH.LocomotionMode = LM_LedgeWalk;
             }
         }
 
@@ -713,6 +732,11 @@ function OnReceiveData(string Data)
             if (DH.ShadowProxyFullBodyAnimSlot != None)
                 DH.ShadowProxyFullBodyAnimSlot.StopCustomAnim(0.1);
         }
+        else if (OldLocoMode == 3 || OldLocoMode == 4 || OldLocoMode == 5) // leaving ladder / ledge
+        {
+            if (DH.ShadowProxyFullBodyAnimSlot != None)
+                DH.ShadowProxyFullBodyAnimSlot.StopCustomAnim(0.15);
+        }
 
         switch (NewLocoMode)
         {
@@ -729,7 +753,55 @@ function OnReceiveData(string Data)
                         break;
                     case 5: // SMT_JumpOver
                         if (DH.ShadowProxyFullBodyAnimSlot != None)
-                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_jump_from_run', 1.0, 0.1, 0.0, false, true);
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim(
+                                (VSize(NewVel) > 300.0) ? 'player_jump_over_from_run' : 'player_jump_over_from_walk',
+                                1.0, 0.1, 0.0, false, true);
+                        break;
+                    case 6: // SMT_JumpOverAndGrabLedge
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_jump_over_to_ledge', 1.0, 0.1, 0.0, false, true);
+                        break;
+                    case 7: // SMT_SlideOver
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_slide_over_from_run', 1.0, 0.1, 0.0, false, true);
+                        break;
+                    case 8: // SMT_ClimbUpObstacle
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim(
+                                (VSize(NewVel) > 300.0) ? 'player_climb_up_from_run' : 'player_climb_up_from_walk',
+                                1.0, 0.1, 0.0, false, true);
+                        break;
+                    case 9: // SMT_ClimbUpWall
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_climb_up_wall_2m', 1.0, 0.1, 0.0, false, true);
+                        break;
+                    case 10: // SMT_ClimbOverWall
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_climb_over_wall_2m', 1.0, 0.1, 0.0, false, true);
+                        break;
+                    case 14: // SMT_GrabLedgeFromGround
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_jump_to_ledge_from_walk', 1.0, 0.1, 0.0, false, true);
+                        break;
+                    case 17: // SMT_ClimbUpLedge
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_climb_ledge_to_stand', 1.0, 0.1, 0.0, false, true);
+                        break;
+                    case 18: // SMT_DropFromLedge
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_ledge_walk_stepoff', 1.0, 0.1, 0.0, false, true);
+                        break;
+                    case 19: // SMT_GrabAndClimb — grab ledge and immediately climb up
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_climb_ledge_to_stand', 1.0, 0.1, 0.0, false, true);
+                        break;
+                    case 44: // SMT_EnterLadderFromAbove
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_ladder_enter_above', 1.0, 0.1, 0.0, false, true);
+                        break;
+                    case 48: // SMT_GrabLadderFromAir
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_ladder_grab_from_air', 1.0, 0.1, 0.0, false, true);
                         break;
                     case 28: // SMT_EnterDoorInteraction — player approaches and grabs door
                         RemotePlayers[Idx].LastDoorDir = NewDoorDir;
@@ -807,6 +879,24 @@ function OnReceiveData(string Data)
                     default:
                         break;
                 }
+                break;
+
+            case 3: // LM_Ladder
+                DH.LocomotionMode = LM_Ladder;
+                if (DH.ShadowProxyFullBodyAnimSlot != None)
+                    DH.ShadowProxyFullBodyAnimSlot.StopCustomAnim(0.15);
+                break;
+
+            case 4: // LM_LedgeHang
+                DH.LocomotionMode = LM_LedgeHang;
+                if (DH.ShadowProxyFullBodyAnimSlot != None)
+                    DH.ShadowProxyFullBodyAnimSlot.StopCustomAnim(0.15);
+                break;
+
+            case 5: // LM_LedgeWalk
+                DH.LocomotionMode = LM_LedgeWalk;
+                if (DH.ShadowProxyFullBodyAnimSlot != None)
+                    DH.ShadowProxyFullBodyAnimSlot.StopCustomAnim(0.15);
                 break;
 
             case 7: // LM_Door — player holding/slowly pushing door open
