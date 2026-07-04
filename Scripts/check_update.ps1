@@ -106,7 +106,7 @@ if ($topItems.Count -eq 1 -and $topItems[0].PSIsContainer) {
 
 Write-Host "  Installing..." -NoNewline
 
-$installDirClean = $InstallDir.TrimEnd('\')
+$installDirClean = $InstallDir.TrimEnd('\', '"')
 $skipped = @()
 $copied  = 0
 
@@ -138,6 +138,7 @@ Remove-Item $tempZip  -Force -ErrorAction SilentlyContinue
 Remove-Item $tempDir  -Recurse -Force -ErrorAction SilentlyContinue
 
 # Copy Multiplayer.u to the game directory if known
+$GameDir = $GameDir.TrimEnd('\', '"')
 if ($GameDir -and (Test-Path $GameDir)) {
     $modU   = Join-Path $installDirClean "OLGame\CookedPCConsole\OLMP\Multiplayer.u"
     $gameU  = Join-Path $GameDir "OLGame\CookedPCConsole\OLMP\Multiplayer.u"

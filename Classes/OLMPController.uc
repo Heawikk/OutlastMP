@@ -94,7 +94,7 @@ event PlayerTick(float DeltaTime)
     local float   Alpha, DistToDummy;
     local bool    bShouldFade;
     local OLHero  DH, LocalHero;
-    local int     DoorDir, LeanDir;
+    local int     DoorDir, LeanDir, ExtraDir, ExtraType;
 
     super.PlayerTick(DeltaTime);
 
@@ -128,6 +128,14 @@ event PlayerTick(float DeltaTime)
             if (bLeanInputLeft != 0)       LeanDir = 1;
             else if (bLeanInputRight != 0) LeanDir = 2;
 
+            ExtraDir  = 0;
+            ExtraType = 0;
+            if (LocalHero != None)
+            {
+                ExtraDir  = int(LocalHero.bLeftAnim);
+                ExtraType = int(LocalHero.ActiveLedgeTransitionType);
+            }
+
             Payload = "LOC,"
                 $ Pawn.Location.X $ "," $ Pawn.Location.Y $ "," $ Pawn.Location.Z $ ","
                 $ Rotation.Pitch  $ "," $ Rotation.Yaw    $ ","
@@ -137,8 +145,7 @@ event PlayerTick(float DeltaTime)
                 $ (LocalHero != None ? int(LocalHero.CamcorderState)    : 0) $ ","
                 $ (LocalHero != None ? int(LocalHero.LocomotionMode) : 0) $ ","
                 $ (LocalHero != None ? int(LocalHero.SpecialMove) : 0) $ ","
-                $ DoorDir $ ","
-                $ LeanDir;
+                $ DoorDir $ "," $ LeanDir $ "," $ ExtraDir $ "," $ ExtraType;
             NetworkLink.SendText(Payload $ "\n");
         }
 
@@ -176,7 +183,8 @@ event PlayerTick(float DeltaTime)
         if (RemotePlayers[i].LastLocomotionMode == 2   // LM_SpecialMove
         ||  RemotePlayers[i].LastLocomotionMode == 3   // LM_Ladder
         ||  RemotePlayers[i].LastLocomotionMode == 4   // LM_LedgeHang
-        ||  RemotePlayers[i].LastLocomotionMode == 5)  // LM_LedgeWalk
+        ||  RemotePlayers[i].LastLocomotionMode == 5   // LM_LedgeWalk
+        ||  RemotePlayers[i].LastLocomotionMode == 6)  // LM_Squeeze
             SmoothedLoc = RemotePlayers[i].LastReceivedLoc;
         else
             SmoothedLoc = VInterpTo(RemotePlayers[i].DummyPlayer.Location,
@@ -265,6 +273,26 @@ event PlayerTick(float DeltaTime)
             else if (RemotePlayers[i].LastLocomotionMode == 5) // LM_LedgeWalk
             {
                 DH.LocomotionMode = LM_LedgeWalk;
+            }
+            else if (RemotePlayers[i].LastLocomotionMode == 6) // LM_Squeeze
+            {
+                DH.LocomotionMode = LM_Squeeze;
+            }
+            else if (RemotePlayers[i].LastLocomotionMode == 10) // LM_Bed
+            {
+                DH.LocomotionMode = LM_Bed;
+            }
+            else if (RemotePlayers[i].LastLocomotionMode == 12) // LM_Struggle
+            {
+                DH.LocomotionMode = LM_Struggle;
+            }
+            else if (RemotePlayers[i].LastLocomotionMode == 13) // LM_Grabbed
+            {
+                DH.LocomotionMode = LM_Grabbed;
+            }
+            else if (RemotePlayers[i].LastLocomotionMode == 14) // LM_Pushing
+            {
+                DH.LocomotionMode = LM_Pushing;
             }
         }
 
@@ -461,7 +489,7 @@ function OnReceiveData(string Data)
     local vector NewLoc, NewVel;
     local rotator NewRot;
     local bool bNewCrouched, bNewCamcorder;
-    local int NewCamcorderState, NewLocoMode, OldLocoMode, NewSpecialMove, NewDoorDir, NewLeanDir;
+    local int NewCamcorderState, NewLocoMode, OldLocoMode, NewSpecialMove, NewDoorDir, NewLeanDir, NewExtraDir, NewExtraType;
     local int    SenderID, Idx;
     local string Nick;
     local OLHero DH;
@@ -591,6 +619,8 @@ function OnReceiveData(string Data)
     NewSpecialMove    = int(Parts[14]);
     NewDoorDir        = (Parts.Length >= 16) ? int(Parts[15]) : 0;
     NewLeanDir        = (Parts.Length >= 17) ? int(Parts[16]) : 0;
+    NewExtraDir       = (Parts.Length >= 18) ? int(Parts[17]) : 0;
+    NewExtraType      = (Parts.Length >= 19) ? int(Parts[18]) : 0;
 
     RemotePlayers[Idx].LastReceivedLoc  = NewLoc;
     RemotePlayers[Idx].LastReceivedVel  = NewVel;
@@ -795,6 +825,82 @@ function OnReceiveData(string Data)
                         if (DH.ShadowProxyFullBodyAnimSlot != None)
                             DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_climb_ledge_to_stand', 1.0, 0.1, 0.0, false, true);
                         break;
+                    case 4: // SMT_BigLanding
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_landing_big', 1.0, 0.05, 0.1, false, true);
+                        break;
+                    case 16: // SMT_LedgeHangTransition — corner shuffle while hanging
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            switch (NewExtraType)
+                            {
+                                case 1: DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_ledge_move_left_90_outside',  1.0, 0.1, 0.0, false, true); break;
+                                case 2: DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_ledge_move_right_90_inside',  1.0, 0.1, 0.0, false, true); break;
+                                case 3: DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_ledge_move_right_90_outside', 1.0, 0.1, 0.0, false, true); break;
+                                default:DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_ledge_move_left_90_inside',   1.0, 0.1, 0.0, false, true); break;
+                            }
+                        break;
+                    case 20: // SMT_EnterLedgeWalk
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            switch (NewExtraType)
+                            {
+                                case 1: DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_ledge_walk_enter_left_outside_perp',  1.0, 0.1, 0.0, false, true); break;
+                                case 2: DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_ledge_walk_enter_right_inside_perp',  1.0, 0.1, 0.0, false, true); break;
+                                case 3: DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_ledge_walk_enter_right_outside_perp', 1.0, 0.1, 0.0, false, true); break;
+                                default:DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_ledge_walk_enter_left_inside_perp',   1.0, 0.1, 0.0, false, true); break;
+                            }
+                        break;
+                    case 21: // SMT_ExitLedgeWalk
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            switch (NewExtraType)
+                            {
+                                case 1: DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_ledge_walk_exit_left_outside_left',   1.0, 0.1, 0.0, false, true); break;
+                                case 2: DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_ledge_walk_exit_right_inside_left',   1.0, 0.1, 0.0, false, true); break;
+                                case 3: DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_ledge_walk_exit_right_outside_right', 1.0, 0.1, 0.0, false, true); break;
+                                default:DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_ledge_walk_exit_left_inside_right',   1.0, 0.1, 0.0, false, true); break;
+                            }
+                        break;
+                    case 22: // SMT_LedgeWalkTransition
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            switch (NewExtraType)
+                            {
+                                case 1: DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_ledge_walk_transition_left_90_outside',  1.0, 0.1, 0.0, false, true); break;
+                                case 2: DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_ledge_walk_transition_right_90_inside',  1.0, 0.1, 0.0, false, true); break;
+                                case 3: DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_ledge_walk_transition_right_90_outside', 1.0, 0.1, 0.0, false, true); break;
+                                default:DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_ledge_walk_transition_left_90_inside',   1.0, 0.1, 0.0, false, true); break;
+                            }
+                        break;
+                    case 23: // SMT_JumpFromLedgeWalk
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_jump_from_ledge_walk', 1.0, 0.1, 0.0, false, true);
+                        break;
+                    case 24: // SMT_EnterSqueeze
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim(
+                                (NewExtraDir != 0) ? 'player_squeeze_enter_left' : 'player_squeeze_enter_right',
+                                1.0, 0.1, 0.0, false, true);
+                        break;
+                    case 25: // SMT_ExitSqueeze
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim(
+                                (NewExtraDir != 0) ? 'player_squeeze_exit_left' : 'player_squeeze_exit_right',
+                                1.0, 0.1, 0.0, false, true);
+                        break;
+                    case 26: // SMT_AutomaticSqueeze
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_squeeze_through', 1.0, 0.1, 0.0, false, true);
+                        break;
+                    case 27: // SMT_SqueezeReload
+                        if (DH.ShadowProxyRightArmAnimSlot != None)
+                            DH.ShadowProxyRightArmAnimSlot.PlayCustomAnim(
+                                RemotePlayers[Idx].bLastRemoteCamcorder
+                                    ? 'player_squeeze_camera_reload' : 'player_squeeze_camera_reload_inactive',
+                                1.0, 0.15, 0.05, false, true);
+                        if (DH.ShadowProxyLeftArmAnimSlot != None)
+                            DH.ShadowProxyLeftArmAnimSlot.PlayCustomAnim(
+                                RemotePlayers[Idx].bLastRemoteCamcorder
+                                    ? 'player_squeeze_camera_reload' : 'player_squeeze_camera_reload_inactive',
+                                1.0, 0.15, 0.4, false, true);
+                        break;
                     case 44: // SMT_EnterLadderFromAbove
                         if (DH.ShadowProxyFullBodyAnimSlot != None)
                             DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_ladder_enter_above', 1.0, 0.1, 0.0, false, true);
@@ -865,16 +971,59 @@ function OnReceiveData(string Data)
                         if (DH.ShadowProxyFullBodyAnimSlot != None)
                             DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_locker_hide', 1.0, 0.3, -1.0, true, true);
                         break;
+                    case 39: // SMT_ExitLocker
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_locker_exit', 1.0, 0.1, 0.1, false, true);
+                        break;
                     case 40: // SMT_EnterBed
                         if (DH.ShadowProxyFullBodyAnimSlot != None)
                             DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim(
                                 RemotePlayers[Idx].bLastRemoteCrouched
-                                    ? 'player_enter_bed_left' : 'player_enter_bed_left_stand',
+                                    ? ((NewExtraDir != 0) ? 'player_enter_bed_left' : 'player_enter_bed_right')
+                                    : ((NewExtraDir != 0) ? 'player_enter_bed_left_stand' : 'player_enter_bed_right_stand'),
                                 1.0, 0.15, 0.0, false, true);
                         break;
                     case 41: // SMT_ExitBed
                         if (DH.ShadowProxyFullBodyAnimSlot != None)
-                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_exit_bed_left', 1.0, 0.1, 0.1, false, true);
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim(
+                                (NewExtraDir != 0) ? 'player_exit_bed_left' : 'player_exit_bed_right',
+                                1.0, 0.1, 0.1, false, true);
+                        break;
+                    case 49: // SMT_PickupObject
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim(
+                                RemotePlayers[Idx].bLastRemoteCrouched
+                                    ? 'player_crouch_object_pickup_h45v35' : 'player_object_pickup_h62v105',
+                                1.0, 0.1, 0.1, false, true);
+                        break;
+                    case 54: // SMT_StartPushingObject
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim(
+                                (NewExtraDir != 0) ? 'player_push_object_enter_left' : 'player_push_object_enter_right',
+                                1.0, 0.1, 0.0, false, true);
+                        break;
+                    case 55: // SMT_StopPushingObject
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim(
+                                (NewExtraDir != 0) ? 'player_push_object_exit_left' : 'player_push_object_exit_right',
+                                1.0, 0.1, 0.0, false, true);
+                        break;
+                    case 57: // SMT_PushFromLedgeAnimated
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_crouch_over_ledge', 1.0, 0.1, 0.0, false, true);
+                        break;
+                    case 62: // SMT_HeroGrabbedNormal
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_grab', 1.0, 0.1, 0.0, false, true);
+                        break;
+                    case 67: // SMT_HeroThrown
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_grab_throw', 1.0, 0.1, 0.0, false, true);
+                        break;
+                    case 69: // SMT_HeroKilled
+                    case 70: // SMT_Dying
+                        if (DH.ShadowProxyFullBodyAnimSlot != None)
+                            DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_stand_death', 1.0, 0.1, 0.0, false, true);
                         break;
                     default:
                         break;
@@ -897,6 +1046,24 @@ function OnReceiveData(string Data)
                 DH.LocomotionMode = LM_LedgeWalk;
                 if (DH.ShadowProxyFullBodyAnimSlot != None)
                     DH.ShadowProxyFullBodyAnimSlot.StopCustomAnim(0.15);
+                break;
+
+            case 6: // LM_Squeeze
+                DH.LocomotionMode = LM_Squeeze;
+                if (DH.ShadowProxyFullBodyAnimSlot != None)
+                    DH.ShadowProxyFullBodyAnimSlot.StopCustomAnim(0.1);
+                break;
+
+            case 12: // LM_Struggle
+                DH.LocomotionMode = LM_Struggle;
+                break;
+
+            case 13: // LM_Grabbed
+                DH.LocomotionMode = LM_Grabbed;
+                break;
+
+            case 14: // LM_Pushing
+                DH.LocomotionMode = LM_Pushing;
                 break;
 
             case 7: // LM_Door — player holding/slowly pushing door open
@@ -932,6 +1099,11 @@ function OnReceiveData(string Data)
                 {
                     if (DH.ShadowProxyFullBodyAnimSlot != None)
                         DH.ShadowProxyFullBodyAnimSlot.PlayCustomAnim('player_locker_exit', 1.0, 0.1, 0.1, false, true);
+                }
+                else if (OldLocoMode == 6 || OldLocoMode == 12 || OldLocoMode == 13 || OldLocoMode == 14)
+                {
+                    if (DH.ShadowProxyFullBodyAnimSlot != None)
+                        DH.ShadowProxyFullBodyAnimSlot.StopCustomAnim(0.2);
                 }
                 break;
         }

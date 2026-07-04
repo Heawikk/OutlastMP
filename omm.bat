@@ -1,5 +1,5 @@
 @echo off
-SET MOD_VERSION=1.3.2
+SET MOD_VERSION=1.3.3
 setlocal enabledelayedexpansion
 
 cd /d "%~dp0"
@@ -104,7 +104,9 @@ goto MENU
 :: ─────────────────────────────────────────────
 :CHECK_UPDATE
 cls
-powershell -ExecutionPolicy Bypass -File "%~dp0Scripts\check_update.ps1" -LocalVersion "%MOD_VERSION%" -InstallDir "%~dp0" -GameDir "%GAME_DIR%"
+set "_IDIR=%~dp0"
+if "%_IDIR:~-1%"=="\" set "_IDIR=%_IDIR:~0,-1%"
+powershell -ExecutionPolicy Bypass -File "%~dp0Scripts\check_update.ps1" -LocalVersion "%MOD_VERSION%" -InstallDir "%_IDIR%" -GameDir "%GAME_DIR%"
 echo.
 pause
 goto MENU
